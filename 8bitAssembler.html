@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <title>Assembler von Hr. Neuberg</title>
+  <script type="text/javascript">
+
+
+  const regex = /[\s]*(?<Sprungmarke>[a-zA-Z]*:)?[\s]*(?<Befehl>AND|OR|ADD|SUB|LW|SW|MOV|NOP|JEQ|JNE|JGT|JLT|LW|SW|LI|JMP)[\s]*(?<Ziel>[rR][0-3])?[\s]*[,]?[\s]*(?<Quelle>[a-zA-Z]+(?!NOP)|\(?r[0-3]\)?|0x[a-f0-9]{1,2})?[\s]*(?<Kommentar>#.*)?$/gmi;
+  var mnemonics = ["AND","OR","ADD","SUB","LW","SW","MOV","NOP","JEQ","JNE","JGT","JLT","LW","SW","LI","JMP"];
+
+
+  function mnemonic(m){
+    var wort = m[2].toUpperCase();
+    var offset =0;
+    if (m[4] != undefined && m[4][0] != "(" && (wort=="SW" | wort=="LW")){
+      offset = 8;
+    }
+
+    return mnemonics.indexOf(wort)+offset;
+  }
+
+  function assemble(){
+    document.getElementById('mc').value="";
+    var sprungmarken = new Array();
+    var ta = document.getElementById('code').value.split("\n");
+    var ca = new Array(ta.length);
+
+    var zaehler =0;
+    ta.forEach(function(zeile,zeilennummer){ //Suche sprungmarken
+
+      var m = regex.exec(zeile);
+      regex.lastIndex=-1;
+      if (m !== null){
+        var offset = ((mnemonic(m) & 8) /8 );
+        if (m[1] != "") {
+          sprungmarken[zaehler] = m[1];
+        }
+        zaehler += 1 +offset;
+      }
+    })
+    var str ="";
+    ta.forEach(function(zeile,zeilennummer){
+      var m = regex.exec(zeile);
+      regex.lastIndex=-1;
+      if (m !== null){
+        str =(mnemonic(m).toString(16));
+        let zweite =0;
+        let dritte =-1;
+        var re = /([r][0-3])/gmi;
+        if (m[2].toUpperCase() == "JMP"){
+          zweite =15;
+          dritte = sprungmarken.indexOf(m[4]+":").toString(16).padStart(2,"0");
+        } else if (m[2].toUpperCase() == "NOP"){
+
+        }else {
+
+          if (m[3]!=undefined && m[3].match(re)){
+
+            zweite += (4*m[3][1]);
+          }
+          var n = n=m[4].match(re);
+          console.log(m[2] + "-" + m[4]);
+          if (m[4]!=undefined && n!=null ){
+            console.log(n[0]);
+            zweite += (1*n[0][1]);
+
+          } else if(m[4].substring(0,2)=="0x"){
+
+            dritte = m[4].substring(2);
+          } else {
+            dritte = sprungmarken.indexOf(m[4]+":").toString(16).padStart(2,"0");
+          }
+        }
+        str += zweite.toString(16);
+        if (dritte != -1){
+          str += " " + dritte;
+        }
+        str += "\n";
+        document.getElementById('mc').value+=str;
+      } else { //PARSER FEHLER
+        document.getElementById('mc').value+="\n";
+      }
+    })
+
+  }
+function copyToClipboard(was){
+  assemble();
+  was.focus();
+  was.select();
+  document.execCommand("copy");
+}
+  </script>
+  <style media="screen">
+  textarea {
+    background-image: linear-gradient(#F1F1F1 50%, #F9F9F9 50%);
+    background-size: 100% 4rem;
+    background-attachment:local;
+    border: 1px solid #CCC;
+    line-height: 2rem;
+    resize: none;
+  }
+  .legende{
+    float:right;
+    background-color: lightgray;
+    border: 1px  solid black;
+    border-top:0px;
+    width:592px;
+    margin-right: 6px;
+  }
+  .tg  {border-collapse:collapse;border-spacing:0;display:flow-root;font-size: 10pt;width:600px;}
+  .tg td{padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:black;}
+  .tg th{font-weight:normal;padding:10px 5px;border-style:solid;border-width:1px;overflow:hidden;word-break:normal;border-color:black;}
+  .tg .tg-1wig{font-weight:bold;text-align:left;vertical-align:top}
+  .tg .tg-0lax{text-align:left;vertical-align:top}
+  tr:hover{
+    background-color: lightgreen;
+  }
+  .mc{
+    overflow:hidden
+  }
+</style>
+</head>
+<body>
+  <h1>Assembler für den 8 bit Logisim Computer von Hr Neuberg</h1>
+  <button id="copy" onclick="copyToClipboard(document.getElementById('mc'))">in Zwischenablage kopieren</button>
+  <button type="button" id="uebersetzen" onclick="assemble();">Übersetzen</button>
+  <div style="">
+    <div style="float:left;">
+      <textarea name="mc" id="mc" rows="20" cols="5" readonly spellcheck="false" class="mc"></textarea>
+    </div>
+    <div style="float:left;">
+      <textarea id="code" name="code" rows="20" cols="80" spellcheck="false" onkeyup="assemble();" onkeydown="if(event.ctrlKey && event.keyCode===32 ){var v=this.value,s=this.selectionStart,e=this.selectionEnd;this.value=v.substring(0, s)+'\t'+v.substring(e);this.selectionStart=this.selectionEnd=s+1;return false;}">
+        LI  R1,0x00     # Setze Summe auf 0
+        LI  R0,0x80     # Setze R0 auf den Anfang der Zahlen
+loop:   LW  R2, (R0)    # Hole die Zahl die an der Stelle R0 steht in R2
+        JEQ R2, end     # Springe zum Ende falls die Zahl 0 ist
+        ADD R1, R2      # Ansonsten füge die Zahl der Summe hinzu
+        LI  R3, 0x01    # Lade die 1 in R3
+        ADD R0, R3      # Um r0 um 1 erhöhen zu können
+        JMP loop        # springe nach oben
+end:    SW  R1, 0x40    # Speichere das Ergebnis an Adresse 0x40
+inf:    JMP inf         # Endlose Schleife am Ende(Programmende)</textarea>
+      </div>
+
+
+
+      <div style="float:right;">
+
+        <table class="tg">
+          <tr>
+            <th class="tg-1wig">Befehl</th>
+            <th class="tg-1wig">Wirkung</th>
+            <th class="tg-1wig">Formel</th>
+          </tr>
+          <tr>
+            <td class="tg-0lax">AND Rd, Rs</td>
+            <td class="tg-0lax">Logisches UND</td>
+            <td class="tg-0lax">Rd = Rd AND Rs</td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">OR&nbsp;&nbsp;Rd, Rs</td>
+            <td class="tg-0lax">Logisches OR</td>
+            <td class="tg-0lax">Rd = Rd OR Rs</td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">ADD Rd, Rs</td>
+            <td class="tg-0lax">Plus</td>
+            <td class="tg-0lax">Rd = Rd + Rs</td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">SUB Rd, Rs</td>
+            <td class="tg-0lax">Minus</td>
+            <td class="tg-0lax">Rd = Rd - Rs</td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">LW&nbsp;&nbsp;Rd, (Rs)</td>
+            <td class="tg-0lax">Lese in Rd von der Speicheraddresse die in Rs steht</td>
+            <td class="tg-0lax">Rd = Mem[Rs]</td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">SW&nbsp;&nbsp;Rd, (Rs)</td>
+            <td class="tg-0lax">Schreibe den Wert aus Rs in&nbsp;&nbsp;Speicheraddresse die in Rd steht</td>
+            <td class="tg-0lax">Mem[Rs] = Rd</td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">MOV Rd, Rs</td>
+            <td class="tg-0lax">Setze Rd auf den aktuellen Wert von Rs</td>
+            <td class="tg-0lax">Rd = Rs</td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">NOP</td>
+            <td class="tg-0lax">Tue nichts</td>
+            <td class="tg-0lax"></td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">JEQ Rd, immed</td>
+            <td class="tg-0lax">Springe zu Adresse oder Sprungpunkt wenn Rd gleich Null ist</td>
+            <td class="tg-0lax">PC = immed if Rd == 0</td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">JNE Rd, immed</td>
+            <td class="tg-0lax">Springe zu Adresse oder Sprungpunkt wenn Rd ungleich Null ist</td>
+            <td class="tg-0lax">PC = immed if Rd != 0</td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">JGT Rd, immed</td>
+            <td class="tg-0lax">Springe zu Adresse oder Sprungpunkt wenn Rd größer Null ist</td>
+            <td class="tg-0lax">PC = immed if Rd &gt; 0</td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">JLT Rd, immed</td>
+            <td class="tg-0lax">Springe zu Adresse oder Sprungpunkt wenn Rd kleiner Null ist</td>
+            <td class="tg-0lax">PC = immed if Rd &lt; 0</td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">LW&nbsp;&nbsp;Rd, immed</td>
+            <td class="tg-0lax">Lese Speicheradresse in Rd ein</td>
+            <td class="tg-0lax">Rd = Mem[immed]</td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">SW&nbsp;&nbsp;Rd, immed</td>
+            <td class="tg-0lax">Schreibe den Wert aus Rs an die angegebene Speicheraddresse</td>
+            <td class="tg-0lax">Mem[immed] = Rd</td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">LI&nbsp;&nbsp;Rd, immed</td>
+            <td class="tg-0lax">Lese einen Hexwert in ein Register ein</td>
+            <td class="tg-0lax">Rd = immed</td>
+          </tr>
+          <tr>
+            <td class="tg-0lax">JMP immed</td>
+            <td class="tg-0lax">Springe immer an die angegebene Stelle</td>
+            <td class="tg-0lax">PC = immed</td>
+
+          </tr>
+          <tr>
+            <td colspan="3">
+              <h2>Legende</h2>
+              Rd    - Register Destination  - Zielregister z.B. R1 <br>
+              Rs    - Register Source       - Quellregister z.B R2 <br>
+              immed - Immediate value       - Unmittelbarer Wert z.B. 0x01 oder Sprungmarke
+            </td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <br>
+
+
+    <script type="text/javascript">
+    var s1 = document.getElementById('mc');
+    var s2 = document.getElementById('code');
+    function select_scroll_1(e) { s2.scrollTop = s1.scrollTop; }
+    function select_scroll_2(e) { s1.scrollTop = s2.scrollTop; }
+    s1.addEventListener('scroll', select_scroll_1, false);
+    s2.addEventListener('scroll', select_scroll_2, false);
+    assemble();
+    </script>
+  </body>
+  </html>
